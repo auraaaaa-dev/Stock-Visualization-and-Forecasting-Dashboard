@@ -1,6 +1,5 @@
 # Stock-Visualization-and-Forecasting-Dashboard
    A comprehensive stock market analysis dashboard with real-time data, technical indicators, and price forecasting built with Streamlit.
-
 ## Features
 
 - Real-time stock data from Yahoo Finance
@@ -42,49 +41,6 @@
    streamlit run app.py
    ```
 
-## Making Changes
-
-### Adding New Features
-1. Create a new branch:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. Make your changes to the code
-
-3. Test your changes locally:
-   ```bash
-   streamlit run app.py
-   ```
-
-4. Commit and push your changes:
-   ```bash
-   git add .
-   git commit -m "Add your feature description"
-   git push origin feature/your-feature-name
-   ```
-
-5. Create a Pull Request on GitHub
-
-### Updating Dependencies
-1. Update requirements.txt:
-   ```bash
-   pip freeze > requirements.txt
-   ```
-
-2. Test the updated dependencies:
-   ```bash
-   pip install -r requirements.txt
-   streamlit run app.py
-   ```
-
-3. Commit the changes:
-   ```bash
-   git add requirements.txt
-   git commit -m "Update dependencies"
-   git push
-   ```
-
 ## Usage
 
 1. Select a stock:
@@ -114,38 +70,11 @@ This dashboard is deployed on Streamlit Cloud:
 
 2. Streamlit Cloud will automatically update the deployment
 
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **No data found for symbol**:
-   - Check if the stock symbol is correct
-   - Try a different date range
-   - Verify internet connection
-
-2. **Forecasting errors**:
-   - Ensure at least 60 days of historical data
-   - Try a different stock symbol
-   - Reduce forecast days
-
-3. **Installation issues**:
-   - Make sure Python 3.8+ is installed
-   - Try creating a new virtual environment
-   - Update pip: `python -m pip install --upgrade pip`
-
 ## Requirements
 
 - Python 3.8+
 - Dependencies listed in requirements.txt
 - Internet connection for real-time data
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
 
 ## License
 
