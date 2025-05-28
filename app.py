@@ -61,22 +61,66 @@ def fetch_stock_data(symbol, start_date, end_date, interval):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            data = yf.download(symbol, start=start_date, end=end_date, interval=interval, progress=False)
+            # Add a small delay between retries
+            if attempt > 0:
+                time.sleep(2)
+            
+            # Try to get the ticker first to validate the symbol
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            
+            if not info or 'regularMarketPrice' not in info:
+                raise ValueError(f"Invalid symbol: {symbol}")
+            
+            # Download data with progress=False to avoid UI issues
+            data = yf.download(
+                symbol,
+                start=start_date,
+                end=end_date,
+                interval=interval,
+                progress=False,
+                threads=False  # Disable threading to avoid rate limits
+            )
+            
             if not data.empty:
                 return data
-            time.sleep(1)  # Wait before retry
+            
+            # If data is empty but symbol is valid, try with a shorter date range
+            if attempt == max_retries - 1:
+                # Try last 30 days as fallback
+                fallback_start = end_date - timedelta(days=30)
+                data = yf.download(
+                    symbol,
+                    start=fallback_start,
+                    end=end_date,
+                    interval=interval,
+                    progress=False,
+                    threads=False
+                )
+                if not data.empty:
+                    return data
+                
         except Exception as e:
             if attempt == max_retries - 1:
                 raise e
-            time.sleep(1)  # Wait before retry
+            continue
+    
     return pd.DataFrame()
 
 # Cache stock info
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def fetch_stock_info(symbol):
     try:
-        return yf.Ticker(symbol).info
-    except:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+        
+        # Validate the info
+        if not info or 'regularMarketPrice' not in info:
+            return {}
+            
+        return info
+    except Exception as e:
+        st.warning(f"Could not fetch detailed stock info: {str(e)}")
         return {}
 
 # Title
@@ -180,6 +224,15 @@ if st.sidebar.button("Analyze"):
                 st.write("2. Try a different date range")
                 st.write("3. Check your internet connection")
                 st.write("4. Try a different time interval")
+                st.write("5. Try using a different stock symbol")
+                
+                # Add a button to try with a shorter date range
+                if st.button("Try with last 30 days"):
+                    new_start_date = end_date - timedelta(days=30)
+                    data = fetch_stock_data(symbol, new_start_date, end_date, interval)
+                    if not data.empty:
+                        st.success("Successfully fetched data for the last 30 days!")
+                        st.experimental_rerun()
             else:
                 # Convert index to datetime if it's not already
                 data.index = pd.to_datetime(data.index)
