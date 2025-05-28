@@ -11,5 +11,7 @@ services:
         value: 3.9.0
       - key: PORT
         value: 10000
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
     healthCheckPath: /
     autoDeploy: true
