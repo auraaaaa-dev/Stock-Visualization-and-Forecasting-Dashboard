@@ -1,5 +1,4 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -7,6 +6,8 @@ from datetime import datetime, timedelta
 from prophet import Prophet
 import numpy as np
 import time
+import requests
+from typing import Dict, Optional
 
 # Set page configuration
 st.set_page_config(
@@ -55,70 +56,125 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+class AlphaVantageAPI:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://www.alphavantage.co/query"
+    
+    def get_daily_data(self, symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        params = {
+            "function": "TIME_SERIES_DAILY",
+            "symbol": symbol,
+            "apikey": self.api_key,
+            "outputsize": "full"
+        }
+        
+        response = requests.get(self.base_url, params=params)
+        data = response.json()
+        
+        if "Error Message" in data:
+            raise ValueError(data["Error Message"])
+        
+        if "Time Series (Daily)" not in data:
+            raise ValueError(f"No data found for {symbol}")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame.from_dict(data["Time Series (Daily)"], orient="index")
+        df.index = pd.to_datetime(df.index)
+        df.columns = ["Open", "High", "Low", "Close", "Volume"]
+        df = df.astype(float)
+        
+        # Filter date range
+        df = df[(df.index >= start_date) & (df.index <= end_date)]
+        return df.sort_index()
+    
+    def get_weekly_data(self, symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        params = {
+            "function": "TIME_SERIES_WEEKLY",
+            "symbol": symbol,
+            "apikey": self.api_key
+        }
+        
+        response = requests.get(self.base_url, params=params)
+        data = response.json()
+        
+        if "Error Message" in data:
+            raise ValueError(data["Error Message"])
+        
+        if "Weekly Time Series" not in data:
+            raise ValueError(f"No data found for {symbol}")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame.from_dict(data["Weekly Time Series"], orient="index")
+        df.index = pd.to_datetime(df.index)
+        df.columns = ["Open", "High", "Low", "Close", "Volume"]
+        df = df.astype(float)
+        
+        # Filter date range
+        df = df[(df.index >= start_date) & (df.index <= end_date)]
+        return df.sort_index()
+    
+    def get_monthly_data(self, symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        params = {
+            "function": "TIME_SERIES_MONTHLY",
+            "symbol": symbol,
+            "apikey": self.api_key
+        }
+        
+        response = requests.get(self.base_url, params=params)
+        data = response.json()
+        
+        if "Error Message" in data:
+            raise ValueError(data["Error Message"])
+        
+        if "Monthly Time Series" not in data:
+            raise ValueError(f"No data found for {symbol}")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame.from_dict(data["Monthly Time Series"], orient="index")
+        df.index = pd.to_datetime(df.index)
+        df.columns = ["Open", "High", "Low", "Close", "Volume"]
+        df = df.astype(float)
+        
+        # Filter date range
+        df = df[(df.index >= start_date) & (df.index <= end_date)]
+        return df.sort_index()
+    
+    def get_stock_info(self, symbol: str) -> Dict:
+        params = {
+            "function": "OVERVIEW",
+            "symbol": symbol,
+            "apikey": self.api_key
+        }
+        
+        response = requests.get(self.base_url, params=params)
+        return response.json()
+
+# Initialize API
+api_key = st.secrets["ALPHA_VANTAGE_API_KEY"]  # Store your API key in Streamlit secrets
+api = AlphaVantageAPI(api_key)
+
 # Cache data fetching
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def fetch_stock_data(symbol, start_date, end_date, interval):
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            # Add a small delay between retries
-            if attempt > 0:
-                time.sleep(2)
-            
-            # Try to get the ticker first to validate the symbol
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            
-            if not info or 'regularMarketPrice' not in info:
-                raise ValueError(f"Invalid symbol: {symbol}")
-            
-            # Download data with progress=False to avoid UI issues
-            data = yf.download(
-                symbol,
-                start=start_date,
-                end=end_date,
-                interval=interval,
-                progress=False,
-                threads=False  # Disable threading to avoid rate limits
-            )
-            
-            if not data.empty:
-                return data
-            
-            # If data is empty but symbol is valid, try with a shorter date range
-            if attempt == max_retries - 1:
-                # Try last 30 days as fallback
-                fallback_start = end_date - timedelta(days=30)
-                data = yf.download(
-                    symbol,
-                    start=fallback_start,
-                    end=end_date,
-                    interval=interval,
-                    progress=False,
-                    threads=False
-                )
-                if not data.empty:
-                    return data
-                
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise e
-            continue
-    
-    return pd.DataFrame()
+def fetch_stock_data(symbol: str, start_date: datetime, end_date: datetime, interval: str) -> pd.DataFrame:
+    try:
+        if interval == "1d":
+            return api.get_daily_data(symbol, start_date, end_date)
+        elif interval == "1wk":
+            return api.get_weekly_data(symbol, start_date, end_date)
+        elif interval == "1mo":
+            return api.get_monthly_data(symbol, start_date, end_date)
+        else:
+            raise ValueError(f"Invalid interval: {interval}")
+    except Exception as e:
+        st.error(f"Error fetching data: {str(e)}")
+        return pd.DataFrame()
 
 # Cache stock info
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def fetch_stock_info(symbol):
+def fetch_stock_info(symbol: str) -> Dict:
     try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-        
-        # Validate the info
-        if not info or 'regularMarketPrice' not in info:
-            return {}
-            
-        return info
+        return api.get_stock_info(symbol)
     except Exception as e:
         st.warning(f"Could not fetch detailed stock info: {str(e)}")
         return {}
@@ -225,30 +281,19 @@ if st.sidebar.button("Analyze"):
                 st.write("3. Check your internet connection")
                 st.write("4. Try a different time interval")
                 st.write("5. Try using a different stock symbol")
-                
-                # Add a button to try with a shorter date range
-                if st.button("Try with last 30 days"):
-                    new_start_date = end_date - timedelta(days=30)
-                    data = fetch_stock_data(symbol, new_start_date, end_date, interval)
-                    if not data.empty:
-                        st.success("Successfully fetched data for the last 30 days!")
-                        st.experimental_rerun()
             else:
-                # Convert index to datetime if it's not already
-                data.index = pd.to_datetime(data.index)
-                
                 # Display stock info
                 stock_info = fetch_stock_info(symbol)
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    current_price = stock_info.get('currentPrice', data['Close'].iloc[-1])
+                    current_price = float(stock_info.get('LatestPrice', data['Close'].iloc[-1]))
                     st.metric("Current Price", f"${current_price:.2f}")
                 with col2:
-                    high_52w = stock_info.get('fiftyTwoWeekHigh', data['High'].max())
+                    high_52w = float(stock_info.get('52WeekHigh', data['High'].max()))
                     st.metric("52 Week High", f"${high_52w:.2f}")
                 with col3:
-                    low_52w = stock_info.get('fiftyTwoWeekLow', data['Low'].min())
+                    low_52w = float(stock_info.get('52WeekLow', data['Low'].min()))
                     st.metric("52 Week Low", f"${low_52w:.2f}")
                 
                 # Calculate indicators
