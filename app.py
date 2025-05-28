@@ -9,10 +9,29 @@ import numpy as np
 
 # Set page configuration
 st.set_page_config(
-    page_title="Stock Dashboard",
+    page_title="Stock Market Dashboard",
     page_icon="📈",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .main {
+        padding: 2rem;
+    }
+    .stButton>button {
+        width: 100%;
+    }
+    .stock-info {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 1rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Title
 st.title("📈 Stock Market Dashboard")
@@ -55,34 +74,34 @@ POPULAR_STOCKS = {
 # Sidebar
 with st.sidebar:
     st.header("Settings")
-
+    
     # Stock selection with categories
     st.subheader("Select Stock")
-
+    
     # Create tabs for different stock categories
     category_tabs = st.tabs(list(POPULAR_STOCKS.keys()))
-
+    
     selected_stock = None
     for i, (category, tab) in enumerate(zip(POPULAR_STOCKS.keys(), category_tabs)):
         with tab:
             for symbol, name in POPULAR_STOCKS[category].items():
                 if st.button(f"{symbol} - {name}"):
                     selected_stock = symbol
-
+    
     # Custom stock input
     st.subheader("Or Enter Custom Stock Symbol")
     custom_symbol = st.text_input("Enter Stock Symbol", "AAPL").upper()
-
+    
     # Use selected stock or custom input
     symbol = selected_stock if selected_stock else custom_symbol
-
+    
     # Date range selection
     st.subheader("Date Range")
     today = datetime.now()
     default_start_date = today - timedelta(days=365)
     start_date = st.date_input("Start Date", default_start_date)
     end_date = st.date_input("End Date", today)
-
+    
     # Time interval selection
     st.subheader("Time Interval")
     interval = st.selectbox(
@@ -90,13 +109,13 @@ with st.sidebar:
         ["1d", "1wk", "1mo"],
         index=0
     )
-
+    
     # Technical indicators selection
     st.subheader("Technical Indicators")
     show_ma = st.checkbox("Moving Averages", value=True)
     show_rsi = st.checkbox("RSI", value=True)
     show_macd = st.checkbox("MACD", value=True)
-
+    
     # Forecasting settings
     st.subheader("Forecasting")
     forecast_days = st.slider("Forecast Days", 1, 30, 7)
@@ -106,42 +125,51 @@ if st.sidebar.button("Analyze"):
     try:
         # Fetch data
         data = yf.download(symbol, start=start_date, end=end_date, interval=interval)
-
+        
         if data.empty:
             st.error(f"No data found for {symbol}. Please check the symbol and try again.")
         else:
             # Convert index to datetime if it's not already
             data.index = pd.to_datetime(data.index)
-
+            
+            # Display stock info
+            stock_info = yf.Ticker(symbol).info
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Current Price", f"${stock_info.get('currentPrice', 'N/A')}")
+            with col2:
+                st.metric("52 Week High", f"${stock_info.get('fiftyTwoWeekHigh', 'N/A')}")
+            with col3:
+                st.metric("52 Week Low", f"${stock_info.get('fiftyTwoWeekLow', 'N/A')}")
+            
             # Calculate indicators
             if show_ma:
                 data['MA20'] = data['Close'].rolling(window=20).mean()
                 data['MA50'] = data['Close'].rolling(window=50).mean()
-
+            
             if show_rsi:
-                # Calculate RSI manually
                 delta = data['Close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                 rs = gain / loss
                 data['RSI'] = 100 - (100 / (1 + rs))
-
+            
             if show_macd:
-                # Calculate MACD manually
                 exp1 = data['Close'].ewm(span=12, adjust=False).mean()
                 exp2 = data['Close'].ewm(span=26, adjust=False).mean()
                 data['MACD'] = exp1 - exp2
                 data['Signal_Line'] = data['MACD'].ewm(span=9, adjust=False).mean()
-
+            
             # Create tabs
             tab1, tab2, tab3 = st.tabs(["Price Analysis", "Technical Indicators", "Forecasting"])
-
+            
             with tab1:
                 # Create candlestick chart
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
                                 vertical_spacing=0.03,
                                 row_heights=[0.7, 0.3])
-
+                
                 # Candlestick chart
                 fig.add_trace(go.Candlestick(
                     x=data.index,
@@ -151,14 +179,14 @@ if st.sidebar.button("Analyze"):
                     close=data['Close'],
                     name='OHLC'
                 ), row=1, col=1)
-
+                
                 # Volume chart
                 fig.add_trace(go.Bar(
                     x=data.index,
                     y=data['Volume'],
                     name='Volume'
                 ), row=2, col=1)
-
+                
                 # Add moving averages if selected
                 if show_ma:
                     fig.add_trace(go.Scatter(
@@ -167,23 +195,37 @@ if st.sidebar.button("Analyze"):
                         name='MA20',
                         line=dict(color='blue')
                     ), row=1, col=1)
-
+                    
                     fig.add_trace(go.Scatter(
                         x=data.index,
                         y=data['MA50'],
                         name='MA50',
                         line=dict(color='red')
                     ), row=1, col=1)
-
+                
                 fig.update_layout(
                     title=f"{symbol} Stock Price",
                     yaxis_title="Price",
                     xaxis_title="Date",
-                    height=800
+                    height=800,
+                    template="plotly_white"
                 )
-
+                
                 st.plotly_chart(fig, use_container_width=True)
-
+                
+                # Display key statistics
+                st.subheader("Key Statistics")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Open", f"${data['Open'].iloc[-1]:.2f}")
+                with col2:
+                    st.metric("High", f"${data['High'].iloc[-1]:.2f}")
+                with col3:
+                    st.metric("Low", f"${data['Low'].iloc[-1]:.2f}")
+                with col4:
+                    st.metric("Close", f"${data['Close'].iloc[-1]:.2f}")
+            
             with tab2:
                 # RSI
                 if show_rsi:
@@ -195,9 +237,12 @@ if st.sidebar.button("Analyze"):
                     ))
                     fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
                     fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
-                    fig_rsi.update_layout(title="Relative Strength Index (RSI)")
+                    fig_rsi.update_layout(
+                        title="Relative Strength Index (RSI)",
+                        template="plotly_white"
+                    )
                     st.plotly_chart(fig_rsi, use_container_width=True)
-
+                
                 # MACD
                 if show_macd:
                     fig_macd = go.Figure()
@@ -211,23 +256,26 @@ if st.sidebar.button("Analyze"):
                         y=data['Signal_Line'],
                         name='Signal Line'
                     ))
-                    fig_macd.update_layout(title="MACD")
+                    fig_macd.update_layout(
+                        title="MACD",
+                        template="plotly_white"
+                    )
                     st.plotly_chart(fig_macd, use_container_width=True)
-
+            
             with tab3:
                 st.subheader("Price Forecasting")
-
+                
                 try:
                     # Prepare data for Prophet
                     df = pd.DataFrame()
                     df['ds'] = data.index
                     df['y'] = data['Close']
-
+                    
                     # Remove any NaN values
                     df = df.dropna()
-
+                    
                     # Ensure we have enough data points
-                    if len(df) < 60:  # Increased minimum data points
+                    if len(df) < 60:
                         st.error("Not enough data points for forecasting. Please select a longer date range (at least 60 days).")
                     else:
                         # Fit model with more robust settings
@@ -237,104 +285,97 @@ if st.sidebar.button("Analyze"):
                             daily_seasonality=False,
                             changepoint_prior_scale=0.05,
                             seasonality_prior_scale=10.0,
-                            interval_width=0.95  # Increased confidence interval
+                            interval_width=0.95
                         )
-
+                        
                         # Add additional regressors if available
                         if 'Volume' in data.columns:
                             df['volume'] = data['Volume']
                             model.add_regressor('volume')
-
-                        # Fit the model with error handling
-                        try:
-                            model.fit(df)
-                            
-                            # Make predictions
-                            future = model.make_future_dataframe(periods=forecast_days, freq='D')
-
-                            # Add regressors to future dataframe if used
-                            if 'Volume' in data.columns:
-                                # Use the last known volume for future predictions
-                                last_volume = data['Volume'].iloc[-1]
-                                future['volume'] = last_volume
-
-                            forecast = model.predict(future)
-
-                            # Plot predictions
-                            fig_forecast = go.Figure()
-
-                            # Add historical data
-                            fig_forecast.add_trace(go.Scatter(
-                                x=df['ds'],
-                                y=df['y'],
-                                name='Historical',
-                                line=dict(color='blue')
-                            ))
-
-                            # Add forecast
-                            fig_forecast.add_trace(go.Scatter(
-                                x=forecast['ds'][-forecast_days:],
-                                y=forecast['yhat'][-forecast_days:],
-                                name='Forecast',
-                                line=dict(color='red', dash='dash')
-                            ))
-
-                            # Add confidence intervals
-                            fig_forecast.add_trace(go.Scatter(
-                                x=forecast['ds'][-forecast_days:],
-                                y=forecast['yhat_upper'][-forecast_days:],
-                                fill=None,
-                                mode='lines',
-                                line_color='rgba(0,100,80,0.2)',
-                                name='Upper Bound'
-                            ))
-
-                            fig_forecast.add_trace(go.Scatter(
-                                x=forecast['ds'][-forecast_days:],
-                                y=forecast['yhat_lower'][-forecast_days:],
-                                fill='tonexty',
-                                mode='lines',
-                                line_color='rgba(0,100,80,0.2)',
-                                name='Lower Bound'
-                            ))
-
-                            fig_forecast.update_layout(
-                                title=f"{symbol} Price Forecast",
-                                xaxis_title="Date",
-                                yaxis_title="Price",
-                                showlegend=True
-                            )
-
-                            st.plotly_chart(fig_forecast, use_container_width=True)
-
-                            # Display forecast metrics
-                            st.subheader("Forecast Metrics")
-                            metrics_df = pd.DataFrame({
-                                'Metric': ['Forecast Start', 'Forecast End', 'Predicted Price', 'Confidence Interval'],
-                                'Value': [
-                                    forecast['ds'][-forecast_days].strftime('%Y-%m-%d'),
-                                    forecast['ds'][-1].strftime('%Y-%m-%d'),
-                                    f"${forecast['yhat'][-1]:.2f}",
-                                    f"±${(forecast['yhat_upper'][-1] - forecast['yhat_lower'][-1])/2:.2f}"
-                                ]
-                            })
-                            st.table(metrics_df)
-
-                            # Add forecast components
-                            st.subheader("Forecast Components")
-                            components = model.plot_components(forecast)
-                            st.pyplot(components)
-
-                        except Exception as model_error:
-                            st.error(f"Error in model fitting: {str(model_error)}")
-                            st.info("Try these solutions:")
-                            st.write("1. Select a longer date range (at least 60 days)")
-                            st.write("2. Try a different stock symbol")
-                            st.write("3. Reduce the forecast days")
-
+                        
+                        # Fit the model
+                        model.fit(df)
+                        
+                        # Make predictions
+                        future = model.make_future_dataframe(periods=forecast_days, freq='D')
+                        
+                        # Add regressors to future dataframe if used
+                        if 'Volume' in data.columns:
+                            last_volume = data['Volume'].iloc[-1]
+                            future['volume'] = last_volume
+                        
+                        forecast = model.predict(future)
+                        
+                        # Plot predictions
+                        fig_forecast = go.Figure()
+                        
+                        # Add historical data
+                        fig_forecast.add_trace(go.Scatter(
+                            x=df['ds'],
+                            y=df['y'],
+                            name='Historical',
+                            line=dict(color='blue')
+                        ))
+                        
+                        # Add forecast
+                        fig_forecast.add_trace(go.Scatter(
+                            x=forecast['ds'][-forecast_days:],
+                            y=forecast['yhat'][-forecast_days:],
+                            name='Forecast',
+                            line=dict(color='red', dash='dash')
+                        ))
+                        
+                        # Add confidence intervals
+                        fig_forecast.add_trace(go.Scatter(
+                            x=forecast['ds'][-forecast_days:],
+                            y=forecast['yhat_upper'][-forecast_days:],
+                            fill=None,
+                            mode='lines',
+                            line_color='rgba(0,100,80,0.2)',
+                            name='Upper Bound'
+                        ))
+                        
+                        fig_forecast.add_trace(go.Scatter(
+                            x=forecast['ds'][-forecast_days:],
+                            y=forecast['yhat_lower'][-forecast_days:],
+                            fill='tonexty',
+                            mode='lines',
+                            line_color='rgba(0,100,80,0.2)',
+                            name='Lower Bound'
+                        ))
+                        
+                        fig_forecast.update_layout(
+                            title=f"{symbol} Price Forecast",
+                            xaxis_title="Date",
+                            yaxis_title="Price",
+                            showlegend=True,
+                            template="plotly_white"
+                        )
+                        
+                        st.plotly_chart(fig_forecast, use_container_width=True)
+                        
+                        # Display forecast metrics
+                        st.subheader("Forecast Metrics")
+                        metrics_df = pd.DataFrame({
+                            'Metric': ['Forecast Start', 'Forecast End', 'Predicted Price', 'Confidence Interval'],
+                            'Value': [
+                                forecast['ds'][-forecast_days].strftime('%Y-%m-%d'),
+                                forecast['ds'][-1].strftime('%Y-%m-%d'),
+                                f"${forecast['yhat'][-1]:.2f}",
+                                f"±${(forecast['yhat_upper'][-1] - forecast['yhat_lower'][-1])/2:.2f}"
+                            ]
+                        })
+                        st.table(metrics_df)
+                        
+                        # Add forecast components
+                        st.subheader("Forecast Components")
+                        components = model.plot_components(forecast)
+                        st.pyplot(components)
+                
                 except Exception as e:
                     st.error(f"Error in forecasting: {str(e)}")
                     st.info("Please try with a different date range or stock symbol.")
-
+    
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
+        st.info("Please check your internet connection and try again.")
