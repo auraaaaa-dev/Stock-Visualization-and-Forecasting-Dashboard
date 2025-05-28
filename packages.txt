@@ -5,3 +5,4 @@ python3-setuptools
 python3-wheel
 python3-cffi
 python3-cryptography
+python3-requests
