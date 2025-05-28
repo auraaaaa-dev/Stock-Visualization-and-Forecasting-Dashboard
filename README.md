@@ -1,80 +1,79 @@
 # Stock-Visualization-and-Forecasting-Dashboard
-   A comprehensive stock market analysis dashboard with real-time data, technical indicators, and price forecasting built with Streamlit.
+  A comprehensive stock market dashboard built with Streamlit and Alpha Vantage API.
+
 ## Features
 
-- Real-time stock data from Yahoo Finance
-- Interactive candlestick charts with volume analysis
-- Technical indicators:
-  - Moving Averages (MA20, MA50)
-  - Relative Strength Index (RSI)
-  - Moving Average Convergence Divergence (MACD)
+- Real-time stock data visualization
+- Technical indicators (MA, RSI, MACD)
 - Price forecasting using Prophet
-- Multiple stock categories:
-  - Technology (AAPL, MSFT, GOOGL, etc.)
-  - Finance (JPM, BAC, V, etc.)
-  - Healthcare (JNJ, PFE, MRK, etc.)
-  - Consumer (WMT, KO, MCD, etc.)
-- Custom stock symbol input
-- Adjustable date ranges and intervals (daily, weekly, monthly)
+- Interactive charts and analysis
+- Multiple time intervals (daily, weekly, monthly)
 
 ## Setup
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Stock-Visualization-and-Forecasting-Dashboard.git
-   cd Stock-Visualization-and-Forecasting-Dashboard
-   ```
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd stock-dashboard
+```
 
-2. Create a virtual environment (recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
 3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
+```bash
+pip install -r requirements.txt
+```
+
+4. Get an Alpha Vantage API key:
+   - Go to https://www.alphavantage.co/
+   - Sign up for a free API key
+   - Create a `.streamlit/secrets.toml` file with:
+   ```toml
+   ALPHA_VANTAGE_API_KEY = "your_api_key_here"
    ```
 
-4. Run the dashboard:
-   ```bash
-   streamlit run app.py
-   ```
-
-## Usage
-
-1. Select a stock:
-   - Choose from predefined categories
-   - Or enter a custom stock symbol
-
-2. Configure analysis:
-   - Set date range
-   - Choose time interval
-   - Select technical indicators
-
-3. View analysis:
-   - Price Analysis tab: Candlestick chart with volume
-   - Technical Indicators tab: RSI and MACD
-   - Forecasting tab: Price predictions with confidence intervals
+5. Run the app:
+```bash
+streamlit run app.py
+```
 
 ## Deployment
 
-This dashboard is deployed on Streamlit Cloud:
+### Local Development
+- Run `streamlit run app.py`
+- Access the app at http://localhost:8501
 
-1. Push changes to GitHub:
-   ```bash
-   git add .
-   git commit -m "Your commit message"
-   git push
-   ```
+### Render Deployment
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Add your Alpha Vantage API key in the environment variables
+4. Deploy!
 
-2. Streamlit Cloud will automatically update the deployment
+## Environment Variables
 
-## Requirements
+- `ALPHA_VANTAGE_API_KEY`: Your Alpha Vantage API key
+- `PORT`: Port number for the web service (default: 10000)
 
-- Python 3.8+
-- Dependencies listed in requirements.txt
-- Internet connection for real-time data
+## Dependencies
+
+- streamlit==1.32.0
+- pandas==2.2.0
+- plotly==5.18.0
+- prophet==1.1.5
+- numpy==1.26.3
+- requests==2.31.0
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
