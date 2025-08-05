@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
-from prophet import Prophet
 import numpy as np
 import requests
 from typing import Dict
@@ -99,50 +98,6 @@ class AlphaVantageAPI:
         df = df[(df.index >= start_date) & (df.index <= end_date)]
         return df.sort_index()
     
-    def get_weekly_data(self, symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
-        params = {
-            "function": "TIME_SERIES_WEEKLY",
-            "symbol": symbol,
-            "apikey": self.api_key
-        }
-        response = requests.get(self.base_url, params=params)
-        data = response.json()
-        
-        if "Error Message" in data:
-            raise ValueError(data["Error Message"])
-        
-        if "Weekly Time Series" not in data:
-            raise ValueError(f"No data found for {symbol}")
-        
-        df = pd.DataFrame.from_dict(data["Weekly Time Series"], orient="index")
-        df.index = pd.to_datetime(df.index)
-        df.columns = ["Open", "High", "Low", "Close", "Volume"]
-        df = df.astype(float)
-        df = df[(df.index >= start_date) & (df.index <= end_date)]
-        return df.sort_index()
-    
-    def get_monthly_data(self, symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
-        params = {
-            "function": "TIME_SERIES_MONTHLY",
-            "symbol": symbol,
-            "apikey": self.api_key
-        }
-        response = requests.get(self.base_url, params=params)
-        data = response.json()
-        
-        if "Error Message" in data:
-            raise ValueError(data["Error Message"])
-        
-        if "Monthly Time Series" not in data:
-            raise ValueError(f"No data found for {symbol}")
-        
-        df = pd.DataFrame.from_dict(data["Monthly Time Series"], orient="index")
-        df.index = pd.to_datetime(df.index)
-        df.columns = ["Open", "High", "Low", "Close", "Volume"]
-        df = df.astype(float)
-        df = df[(df.index >= start_date) & (df.index <= end_date)]
-        return df.sort_index()
-    
     def get_stock_info(self, symbol: str) -> Dict:
         params = {
             "function": "OVERVIEW",
@@ -169,16 +124,9 @@ api = AlphaVantageAPI(api_key)
 
 # Cache data fetching
 @st.cache_data(ttl=3600)
-def fetch_stock_data(symbol: str, start_date: datetime, end_date: datetime, interval: str) -> pd.DataFrame:
+def fetch_stock_data(symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
     try:
-        if interval == "1d":
-            return api.get_daily_data(symbol, start_date, end_date)
-        elif interval == "1wk":
-            return api.get_weekly_data(symbol, start_date, end_date)
-        elif interval == "1mo":
-            return api.get_monthly_data(symbol, start_date, end_date)
-        else:
-            raise ValueError(f"Invalid interval: {interval}")
+        return api.get_daily_data(symbol, start_date, end_date)
     except Exception as e:
         st.error(f"Error fetching data: {str(e)}")
         return pd.DataFrame()
@@ -191,7 +139,7 @@ def fetch_stock_info(symbol: str) -> Dict:
         st.warning(f"Could not fetch detailed stock info: {str(e)}")
         return {}
 
-st.title("📈 Stock Market Dashboard")
+st.title("📈 Stock Market Dashboard (Simple Version)")
 
 POPULAR_STOCKS = {
     'Technology': {
@@ -210,20 +158,6 @@ POPULAR_STOCKS = {
         'V': 'Visa Inc.',
         'MA': 'Mastercard Inc.',
         'GS': 'Goldman Sachs Group Inc.'
-    },
-    'Healthcare': {
-        'JNJ': 'Johnson & Johnson',
-        'PFE': 'Pfizer Inc.',
-        'MRK': 'Merck & Co.',
-        'UNH': 'UnitedHealth Group Inc.',
-        'ABBV': 'AbbVie Inc.'
-    },
-    'Consumer': {
-        'WMT': 'Walmart Inc.',
-        'KO': 'Coca-Cola Co.',
-        'MCD': 'McDonald\'s Corp.',
-        'NKE': 'Nike Inc.',
-        'SBUX': 'Starbucks Corporation'
     }
 }
 
@@ -245,31 +179,20 @@ with st.sidebar:
     default_start_date = today - timedelta(days=365)
     start_date = st.date_input("Start Date", default_start_date)
     end_date = st.date_input("End Date", today)
-    st.subheader("Time Interval")
-    interval = st.selectbox(
-        "Select Interval",
-        ["1d", "1wk", "1mo"],
-        index=0
-    )
     st.subheader("Technical Indicators")
     show_ma = st.checkbox("Moving Averages", value=True)
     show_rsi = st.checkbox("RSI", value=True)
-    show_macd = st.checkbox("MACD", value=True)
-    st.subheader("Forecasting")
-    forecast_days = st.slider("Forecast Days", 1, 30, 7)
 
 if st.sidebar.button("Analyze"):
     try:
         with st.spinner("Fetching data..."):
-            data = fetch_stock_data(symbol, start_date, end_date, interval)
+            data = fetch_stock_data(symbol, start_date, end_date)
             if data.empty:
                 st.error(f"No data found for {symbol}. Please check the symbol and try again.")
                 st.info("Common solutions:")
                 st.write("1. Verify the stock symbol is correct")
                 st.write("2. Try a different date range")
                 st.write("3. Check your internet connection")
-                st.write("4. Try a different time interval")
-                st.write("5. Try using a different stock symbol")
             else:
                 stock_info = fetch_stock_info(symbol)
                 col1, col2, col3 = st.columns(3)
@@ -294,13 +217,7 @@ if st.sidebar.button("Analyze"):
                     rs = gain / loss
                     data['RSI'] = 100 - (100 / (1 + rs))
                 
-                if show_macd:
-                    exp1 = data['Close'].ewm(span=12, adjust=False).mean()
-                    exp2 = data['Close'].ewm(span=26, adjust=False).mean()
-                    data['MACD'] = exp1 - exp2
-                    data['Signal_Line'] = data['MACD'].ewm(span=9, adjust=False).mean()
-                
-                tab1, tab2, tab3 = st.tabs(["Price Analysis", "Technical Indicators", "Forecasting"])
+                tab1, tab2 = st.tabs(["Price Analysis", "Technical Indicators"])
                 
                 with tab1:
                     fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
@@ -375,125 +292,6 @@ if st.sidebar.button("Analyze"):
                             height=400
                         )
                         st.plotly_chart(fig_rsi, use_container_width=True)
-                    
-                    if show_macd:
-                        fig_macd = go.Figure()
-                        fig_macd.add_trace(go.Scatter(
-                            x=data.index,
-                            y=data['MACD'],
-                            name='MACD'
-                        ))
-                        fig_macd.add_trace(go.Scatter(
-                            x=data.index,
-                            y=data['Signal_Line'],
-                            name='Signal Line'
-                        ))
-                        fig_macd.update_layout(
-                            title="MACD",
-                            template="plotly_white",
-                            height=400
-                        )
-                        st.plotly_chart(fig_macd, use_container_width=True)
-                
-                with tab3:
-                    st.subheader("Price Forecasting")
-                    try:
-                        with st.spinner("Generating forecast..."):
-                            df = pd.DataFrame()
-                            df['ds'] = data.index
-                            df['y'] = data['Close']
-                            df = df.dropna()
-                            
-                            if len(df) < 60:
-                                st.error("Not enough data points for forecasting. This may be due to API rate limits. Please wait a minute and try again, or try a different stock/date range.")
-                                st.info("Alpha Vantage free API allows only 5 requests per minute and 500 per day.")
-                            else:
-                                model = Prophet(
-                                    yearly_seasonality=True,
-                                    weekly_seasonality=True,
-                                    daily_seasonality=False,
-                                    changepoint_prior_scale=0.05,
-                                    seasonality_prior_scale=10.0,
-                                    interval_width=0.95
-                                )
-                                
-                                if 'Volume' in data.columns:
-                                    df['volume'] = data['Volume']
-                                    model.add_regressor('volume')
-                                
-                                model.fit(df)
-                                future = model.make_future_dataframe(periods=forecast_days, freq='D')
-                                
-                                if 'Volume' in data.columns:
-                                    last_volume = data['Volume'].iloc[-1]
-                                    future['volume'] = last_volume
-                                
-                                forecast = model.predict(future)
-                                
-                                fig_forecast = go.Figure()
-                                
-                                fig_forecast.add_trace(go.Scatter(
-                                    x=df['ds'],
-                                    y=df['y'],
-                                    name='Historical',
-                                    line=dict(color='blue')
-                                ))
-                                
-                                fig_forecast.add_trace(go.Scatter(
-                                    x=forecast['ds'][-forecast_days:],
-                                    y=forecast['yhat'][-forecast_days:],
-                                    name='Forecast',
-                                    line=dict(color='red', dash='dash')
-                                ))
-                                
-                                fig_forecast.add_trace(go.Scatter(
-                                    x=forecast['ds'][-forecast_days:],
-                                    y=forecast['yhat_upper'][-forecast_days:],
-                                    fill=None,
-                                    mode='lines',
-                                    line_color='rgba(0,100,80,0.2)',
-                                    name='Upper Bound'
-                                ))
-                                
-                                fig_forecast.add_trace(go.Scatter(
-                                    x=forecast['ds'][-forecast_days:],
-                                    y=forecast['yhat_lower'][-forecast_days:],
-                                    fill='tonexty',
-                                    mode='lines',
-                                    line_color='rgba(0,100,80,0.2)',
-                                    name='Lower Bound'
-                                ))
-                                
-                                fig_forecast.update_layout(
-                                    title=f"{symbol} Price Forecast",
-                                    xaxis_title="Date",
-                                    yaxis_title="Price",
-                                    showlegend=True,
-                                    template="plotly_white",
-                                    height=600
-                                )
-                                
-                                st.plotly_chart(fig_forecast, use_container_width=True)
-                                
-                                st.subheader("Forecast Metrics")
-                                metrics_df = pd.DataFrame({
-                                    'Metric': ['Forecast Start', 'Forecast End', 'Predicted Price', 'Confidence Interval'],
-                                    'Value': [
-                                        forecast['ds'][-forecast_days].strftime('%Y-%m-%d'),
-                                        forecast['ds'][-1].strftime('%Y-%m-%d'),
-                                        f"${forecast['yhat'][-1]:.2f}",
-                                        f"±${(forecast['yhat_upper'][-1] - forecast['yhat_lower'][-1])/2:.2f}"
-                                    ]
-                                })
-                                st.table(metrics_df)
-                                
-                                st.subheader("Forecast Components")
-                                components = model.plot_components(forecast)
-                                st.pyplot(components)
-                    
-                    except Exception as e:
-                        st.error(f"Error in forecasting: {str(e)}")
-                        st.info("Please try with a different date range or stock symbol.")
     
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
