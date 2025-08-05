@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -6,11 +5,18 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from prophet import Prophet
 import numpy as np
-import time
 import requests
 from typing import Dict
 
-# Vibrant Pastel CSS
+# Set page configuration
+st.set_page_config(
+    page_title="Stock Market Dashboard",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS
 st.markdown("""
     <style>
     .main {
@@ -65,15 +71,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Set page configuration
-st.set_page_config(
-    page_title="Stock Market Dashboard",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Alpha Vantage API class
 class AlphaVantageAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -88,10 +85,13 @@ class AlphaVantageAPI:
         }
         response = requests.get(self.base_url, params=params)
         data = response.json()
+        
         if "Error Message" in data:
             raise ValueError(data["Error Message"])
+        
         if "Time Series (Daily)" not in data:
             raise ValueError(f"No data found for {symbol}")
+        
         df = pd.DataFrame.from_dict(data["Time Series (Daily)"], orient="index")
         df.index = pd.to_datetime(df.index)
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
@@ -107,10 +107,13 @@ class AlphaVantageAPI:
         }
         response = requests.get(self.base_url, params=params)
         data = response.json()
+        
         if "Error Message" in data:
             raise ValueError(data["Error Message"])
+        
         if "Weekly Time Series" not in data:
             raise ValueError(f"No data found for {symbol}")
+        
         df = pd.DataFrame.from_dict(data["Weekly Time Series"], orient="index")
         df.index = pd.to_datetime(df.index)
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
@@ -126,10 +129,13 @@ class AlphaVantageAPI:
         }
         response = requests.get(self.base_url, params=params)
         data = response.json()
+        
         if "Error Message" in data:
             raise ValueError(data["Error Message"])
+        
         if "Monthly Time Series" not in data:
             raise ValueError(f"No data found for {symbol}")
+        
         df = pd.DataFrame.from_dict(data["Monthly Time Series"], orient="index")
         df.index = pd.to_datetime(df.index)
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
@@ -276,25 +282,31 @@ if st.sidebar.button("Analyze"):
                 with col3:
                     low_52w = float(stock_info.get('52WeekLow', data['Low'].min()))
                     st.metric("52 Week Low", f"${low_52w:.2f}")
+                
                 if show_ma:
                     data['MA20'] = data['Close'].rolling(window=20).mean()
                     data['MA50'] = data['Close'].rolling(window=50).mean()
+                
                 if show_rsi:
                     delta = data['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                     rs = gain / loss
                     data['RSI'] = 100 - (100 / (1 + rs))
+                
                 if show_macd:
                     exp1 = data['Close'].ewm(span=12, adjust=False).mean()
                     exp2 = data['Close'].ewm(span=26, adjust=False).mean()
                     data['MACD'] = exp1 - exp2
                     data['Signal_Line'] = data['MACD'].ewm(span=9, adjust=False).mean()
+                
                 tab1, tab2, tab3 = st.tabs(["Price Analysis", "Technical Indicators", "Forecasting"])
+                
                 with tab1:
                     fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
                                     vertical_spacing=0.03,
                                     row_heights=[0.7, 0.3])
+                    
                     fig.add_trace(go.Candlestick(
                         x=data.index,
                         open=data['Open'],
@@ -303,11 +315,13 @@ if st.sidebar.button("Analyze"):
                         close=data['Close'],
                         name='OHLC'
                     ), row=1, col=1)
+                    
                     fig.add_trace(go.Bar(
                         x=data.index,
                         y=data['Volume'],
                         name='Volume'
                     ), row=2, col=1)
+                    
                     if show_ma:
                         fig.add_trace(go.Scatter(
                             x=data.index,
@@ -315,12 +329,14 @@ if st.sidebar.button("Analyze"):
                             name='MA20',
                             line=dict(color='blue')
                         ), row=1, col=1)
+                        
                         fig.add_trace(go.Scatter(
                             x=data.index,
                             y=data['MA50'],
                             name='MA50',
                             line=dict(color='red')
                         ), row=1, col=1)
+                    
                     fig.update_layout(
                         title=f"{symbol} Stock Price",
                         yaxis_title="Price",
@@ -329,7 +345,9 @@ if st.sidebar.button("Analyze"):
                         template="plotly_white",
                         xaxis_rangeslider_visible=False
                     )
+                    
                     st.plotly_chart(fig, use_container_width=True)
+                    
                     st.subheader("Key Statistics")
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
@@ -340,6 +358,7 @@ if st.sidebar.button("Analyze"):
                         st.metric("Low", f"${data['Low'].iloc[-1]:.2f}")
                     with col4:
                         st.metric("Close", f"${data['Close'].iloc[-1]:.2f}")
+                
                 with tab2:
                     if show_rsi:
                         fig_rsi = go.Figure()
@@ -356,6 +375,7 @@ if st.sidebar.button("Analyze"):
                             height=400
                         )
                         st.plotly_chart(fig_rsi, use_container_width=True)
+                    
                     if show_macd:
                         fig_macd = go.Figure()
                         fig_macd.add_trace(go.Scatter(
@@ -374,6 +394,7 @@ if st.sidebar.button("Analyze"):
                             height=400
                         )
                         st.plotly_chart(fig_macd, use_container_width=True)
+                
                 with tab3:
                     st.subheader("Price Forecasting")
                     try:
@@ -382,6 +403,7 @@ if st.sidebar.button("Analyze"):
                             df['ds'] = data.index
                             df['y'] = data['Close']
                             df = df.dropna()
+                            
                             if len(df) < 60:
                                 st.error("Not enough data points for forecasting. This may be due to API rate limits. Please wait a minute and try again, or try a different stock/date range.")
                                 st.info("Alpha Vantage free API allows only 5 requests per minute and 500 per day.")
@@ -394,28 +416,36 @@ if st.sidebar.button("Analyze"):
                                     seasonality_prior_scale=10.0,
                                     interval_width=0.95
                                 )
+                                
                                 if 'Volume' in data.columns:
                                     df['volume'] = data['Volume']
                                     model.add_regressor('volume')
+                                
                                 model.fit(df)
                                 future = model.make_future_dataframe(periods=forecast_days, freq='D')
+                                
                                 if 'Volume' in data.columns:
                                     last_volume = data['Volume'].iloc[-1]
                                     future['volume'] = last_volume
+                                
                                 forecast = model.predict(future)
+                                
                                 fig_forecast = go.Figure()
+                                
                                 fig_forecast.add_trace(go.Scatter(
                                     x=df['ds'],
                                     y=df['y'],
                                     name='Historical',
                                     line=dict(color='blue')
                                 ))
+                                
                                 fig_forecast.add_trace(go.Scatter(
                                     x=forecast['ds'][-forecast_days:],
                                     y=forecast['yhat'][-forecast_days:],
                                     name='Forecast',
                                     line=dict(color='red', dash='dash')
                                 ))
+                                
                                 fig_forecast.add_trace(go.Scatter(
                                     x=forecast['ds'][-forecast_days:],
                                     y=forecast['yhat_upper'][-forecast_days:],
@@ -424,6 +454,7 @@ if st.sidebar.button("Analyze"):
                                     line_color='rgba(0,100,80,0.2)',
                                     name='Upper Bound'
                                 ))
+                                
                                 fig_forecast.add_trace(go.Scatter(
                                     x=forecast['ds'][-forecast_days:],
                                     y=forecast['yhat_lower'][-forecast_days:],
@@ -432,6 +463,7 @@ if st.sidebar.button("Analyze"):
                                     line_color='rgba(0,100,80,0.2)',
                                     name='Lower Bound'
                                 ))
+                                
                                 fig_forecast.update_layout(
                                     title=f"{symbol} Price Forecast",
                                     xaxis_title="Date",
@@ -440,7 +472,9 @@ if st.sidebar.button("Analyze"):
                                     template="plotly_white",
                                     height=600
                                 )
+                                
                                 st.plotly_chart(fig_forecast, use_container_width=True)
+                                
                                 st.subheader("Forecast Metrics")
                                 metrics_df = pd.DataFrame({
                                     'Metric': ['Forecast Start', 'Forecast End', 'Predicted Price', 'Confidence Interval'],
@@ -452,12 +486,15 @@ if st.sidebar.button("Analyze"):
                                     ]
                                 })
                                 st.table(metrics_df)
+                                
                                 st.subheader("Forecast Components")
                                 components = model.plot_components(forecast)
                                 st.pyplot(components)
+                    
                     except Exception as e:
                         st.error(f"Error in forecasting: {str(e)}")
                         st.info("Please try with a different date range or stock symbol.")
+    
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
         st.info("Please check your internet connection and try again.")
