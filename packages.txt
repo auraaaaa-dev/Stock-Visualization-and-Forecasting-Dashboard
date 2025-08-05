@@ -6,3 +6,10 @@ python3-wheel
 python3-cffi
 python3-cryptography
 python3-requests
+gcc
+g++
+make
+cmake
+libatlas-base-dev
+liblapack-dev
+libblas-dev
