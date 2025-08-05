@@ -1,0 +1,19 @@
+# 🚀 Render Deployment Information
+
+## Start Command
+streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+
+## Environment Variables
+- ALPHA_VANTAGE_API_KEY: Your Alpha Vantage API key
+
+## Build Command
+pip install -r requirements.txt
+
+## Health Check Path
+/
+
+## Auto Deploy
+true
+
+## Python Version
+3.9.0
